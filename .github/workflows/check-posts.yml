@@ -1,0 +1,33 @@
+name: Daily Posting Check
+
+on:
+  schedule:
+    - cron: '0 20 * * *'
+    - cron: '0 21 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run check
+        env:
+          FB_SYSTEM_TOKEN: ${{ secrets.FB_SYSTEM_TOKEN }}
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: node check.js
+      - name: Commit status.json if it changed
+        run: |
+          if [ -f status.json ]; then
+            git config user.name "posting-checker-bot"
+            git config user.email "actions@github.com"
+            git add status.json
+            git diff --cached --quiet || git commit -m "Update status.json"
+            git push
+          fi
