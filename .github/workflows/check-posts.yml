@@ -4,7 +4,12 @@ on:
   schedule:
     - cron: '0 20 * * *'
     - cron: '0 21 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force run now, ignoring the 4pm ET check'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -21,6 +26,7 @@ jobs:
         env:
           FB_SYSTEM_TOKEN: ${{ secrets.FB_SYSTEM_TOKEN }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          FORCE_RUN: ${{ inputs.force }}
         run: node check.js
       - name: Commit status.json if it changed
         run: |
