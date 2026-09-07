@@ -51,8 +51,8 @@ async function checkYouTube(channelId, name, sinceIso, untilIso) {
 
 async function main() {
   const etNow = getEtNow();
-  if (etNow.hour !== 16 && !FORCE_RUN) {
-    console.log("Not 4pm ET right now (ET hour = " + etNow.hour + "). Skipping.");
+  if (etNow.hour !== 15 && !FORCE_RUN) {
+    console.log("Not 3pm ET right now (ET hour = " + etNow.hour + "). Skipping.");
     return;
   }
 
