@@ -2,6 +2,7 @@ const fs = require('fs');
 
 const FB_SYSTEM_TOKEN = process.env.FB_SYSTEM_TOKEN;
 const YT_API_KEY = process.env.YT_API_KEY;
+const FORCE_RUN = process.env.FORCE_RUN === 'true';
 const FB_PAGE_ID = "113808195316326";
 const IG_BUSINESS_ID = "17841456848505726";
 const YT_CHANNEL_1 = "UCFJ-cUZA4bqkyEnSt1HHQyQ";
@@ -50,7 +51,7 @@ async function checkYouTube(channelId, name, sinceIso, untilIso) {
 
 async function main() {
   const etNow = getEtNow();
-  if (etNow.hour !== 16) {
+  if (etNow.hour !== 16 && !FORCE_RUN) {
     console.log("Not 4pm ET right now (ET hour = " + etNow.hour + "). Skipping.");
     return;
   }
