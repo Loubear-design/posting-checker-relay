@@ -1,4 +1,4 @@
-const fs = require('fs');
+<const fs = require('fs');
 const https = require('https');
 
 const FB_SYSTEM_TOKEN = process.env.FB_SYSTEM_TOKEN;
@@ -116,7 +116,7 @@ async function checkYouTube(channelId, startUtc, endUtc) {
 async function main() {
   const et = getEtParts();
 
-  if (et.hour !== 15 && !FORCE_RUN) {
+  if (et.hour < 15 && !FORCE_RUN) {
     console.log(`Not the 3pm ET run (current ET hour: ${et.hour}). Skipping.`);
     return;
   }
