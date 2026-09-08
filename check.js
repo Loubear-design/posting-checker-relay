@@ -11,6 +11,8 @@ const YT_CHANNEL_FAITH = 'UCFJ-cUZA4bqkyEnSt1HHQyQ';
 const YT_CHANNEL_ALIEN = 'UCEBIttKTUHQvubz5quNiybA';
 
 const REQUIRED_FB_IG = 2;
+
+const SHORTS_MAX_SECONDS = 180;
 const REQUIRED_YT = 1;
 
 function httpGetJson(url) {
@@ -103,15 +105,36 @@ async function checkInstagram(pageToken, startUtc, endUtc) {
   }).length;
   return count;
 }
+function parseDurationToSeconds(iso) {
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || '');
+  if (!match) return 0;
+  const hours = parseInt(match[1] || '0', 10);
+  const minutes = parseInt(match[2] || '0', 10);
+  const seconds = parseInt(match[3] || '0', 10);
+  return hours * 3600 + minutes * 60 + seconds;
+}
 
 async function checkYouTube(channelId, startUtc, endUtc) {
   const publishedAfter = startUtc.toISOString();
   const publishedBefore = endUtc.toISOString();
-  const url = `https://www.googleapis.com/youtube/v3/search?key=${YT_API_KEY}&channelId=${channelId}&part=id&order=date&type=video&maxResults=50&publishedAfter=${publishedAfter}&publishedBefore=${publishedBefore}`;
-  const data = await httpGetJson(url);
-  const items = data.items || [];
-  return items.length;
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?key=${YT_API_KEY}&channelId=${channelId}&part=id&order=date&type=video&maxResults=50&publishedAfter=${publishedAfter}&publishedBefore=${publishedBefore}`;
+  const searchData = await httpGetJson(searchUrl);
+  const items = searchData.items || [];
+  if (items.length === 0) return 0;
+
+  const ids = items.map((it) => it.id.videoId).join(',');
+  const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?key=${YT_API_KEY}&id=${ids}&part=contentDetails`;
+  const detailsData = await httpGetJson(detailsUrl);
+  const videos = detailsData.items || [];
+
+  const shortsCount = videos.filter((v) => {
+    const seconds = parseDurationToSeconds(v.contentDetails && v.contentDetails.duration);
+    return seconds > 0 && seconds <= SHORTS_MAX_SECONDS;
+  }).length;
+
+  return shortsCount;
 }
+
 
 async function main() {
   const et = getEtParts();
