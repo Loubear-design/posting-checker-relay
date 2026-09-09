@@ -1,6 +1,6 @@
 {
   "date_checked_et": "2026-09-09",
-  "generated_at_utc": "2026-09-09T21:24:20.526Z",
+  "generated_at_utc": "2026-09-09T22:20:07.071Z",
   "accounts": {
     "facebook": {
       "name": "Facebook Page (Faith Lutheran Church)",
@@ -10,7 +10,7 @@
     },
     "instagram": {
       "name": "Instagram (@faithlutheranlouisville)",
-      "count": 2,
+      "count": 3,
       "required": 2,
       "passed": true
     },
