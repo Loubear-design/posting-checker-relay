@@ -11,9 +11,8 @@ const YT_CHANNEL_FAITH = 'UCFJ-cUZA4bqkyEnSt1HHQyQ';
 const YT_CHANNEL_ALIEN = 'UCEBIttKTUHQvubz5quNiybA';
 
 const REQUIRED_FB_IG = 2;
-
-const SHORTS_MAX_SECONDS = 180;
 const REQUIRED_YT = 1;
+const SHORTS_MAX_SECONDS = 180;
 
 function httpGetJson(url) {
   return new Promise((resolve, reject) => {
@@ -21,13 +20,21 @@ function httpGetJson(url) {
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
+        let parsed;
         try {
-          resolve(JSON.parse(body));
+          parsed = JSON.parse(body);
         } catch (e) {
-          reject(new Error('Failed to parse JSON from ' + url + ': ' + e.message));
+          return reject(new Error('unreadable response (HTTP ' + res.statusCode + ')'));
         }
+        if (parsed && parsed.error) {
+          return reject(new Error(parsed.error.message || JSON.stringify(parsed.error)));
+        }
+        if (res.statusCode >= 400) {
+          return reject(new Error('HTTP ' + res.statusCode));
+        }
+        resolve(parsed);
       });
-    }).on('error', reject);
+    }).on('error', (e) => reject(new Error('network error: ' + e.message)));
   });
 }
 
@@ -79,7 +86,7 @@ async function getPageAccessToken() {
   const url = `https://graph.facebook.com/v19.0/${FB_PAGE_ID}?fields=access_token&access_token=${FB_SYSTEM_TOKEN}`;
   const data = await httpGetJson(url);
   if (!data.access_token) {
-    throw new Error('Could not derive page access token: ' + JSON.stringify(data));
+    throw new Error('no page access token returned');
   }
   return data.access_token;
 }
@@ -87,24 +94,27 @@ async function getPageAccessToken() {
 async function checkFacebook(pageToken, startUtc, endUtc) {
   const url = `https://graph.facebook.com/v19.0/${FB_PAGE_ID}/videos?fields=id,created_time&limit=50&access_token=${pageToken}`;
   const data = await httpGetJson(url);
-  const videos = data.data || [];
-  const count = videos.filter((v) => {
+  if (!Array.isArray(data.data)) {
+    throw new Error('unexpected response shape');
+  }
+  return data.data.filter((v) => {
     const created = new Date(v.created_time);
     return created >= startUtc && created < endUtc;
   }).length;
-  return count;
 }
 
 async function checkInstagram(pageToken, startUtc, endUtc) {
   const url = `https://graph.facebook.com/v19.0/${IG_BUSINESS_ID}/media?fields=id,timestamp,media_type&limit=50&access_token=${pageToken}`;
   const data = await httpGetJson(url);
-  const media = data.data || [];
-  const count = media.filter((m) => {
+  if (!Array.isArray(data.data)) {
+    throw new Error('unexpected response shape');
+  }
+  return data.data.filter((m) => {
     const created = new Date(m.timestamp);
     return created >= startUtc && created < endUtc;
   }).length;
-  return count;
 }
+
 function parseDurationToSeconds(iso) {
   const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || '');
   if (!match) return 0;
@@ -127,14 +137,32 @@ async function checkYouTube(channelId, startUtc, endUtc) {
   const detailsData = await httpGetJson(detailsUrl);
   const videos = detailsData.items || [];
 
-  const shortsCount = videos.filter((v) => {
+  return videos.filter((v) => {
     const seconds = parseDurationToSeconds(v.contentDetails && v.contentDetails.duration);
     return seconds > 0 && seconds <= SHORTS_MAX_SECONDS;
   }).length;
-
-  return shortsCount;
 }
 
+async function settle(fn) {
+  try {
+    return { count: await fn() };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+function buildEntry(name, result, required) {
+  const entry = { name: name, required: required };
+  if (result.error) {
+    entry.count = null;
+    entry.passed = false;
+    entry.error = result.error;
+  } else {
+    entry.count = result.count;
+    entry.passed = result.count >= required;
+  }
+  return entry;
+}
 
 async function main() {
   const et = getEtParts();
@@ -146,52 +174,45 @@ async function main() {
 
   const { startUtc, endUtc } = getEtDayRangeUtc();
 
-  const pageToken = await getPageAccessToken();
+  let pageToken = null;
+  let pageTokenError = null;
+  try {
+    pageToken = await getPageAccessToken();
+  } catch (e) {
+    pageTokenError = 'Facebook token failed: ' + e.message;
+  }
 
-  const [fbCount, igCount, ytFaithCount, ytAlienCount] = await Promise.all([
-    checkFacebook(pageToken, startUtc, endUtc),
-    checkInstagram(pageToken, startUtc, endUtc),
-    checkYouTube(YT_CHANNEL_FAITH, startUtc, endUtc),
-    checkYouTube(YT_CHANNEL_ALIEN, startUtc, endUtc)
+  const [fb, ig, ytFaith, ytAlien] = await Promise.all([
+    pageToken ? settle(() => checkFacebook(pageToken, startUtc, endUtc)) : { error: pageTokenError },
+    pageToken ? settle(() => checkInstagram(pageToken, startUtc, endUtc)) : { error: pageTokenError },
+    settle(() => checkYouTube(YT_CHANNEL_FAITH, startUtc, endUtc)),
+    settle(() => checkYouTube(YT_CHANNEL_ALIEN, startUtc, endUtc))
   ]);
 
   const accounts = {
-    facebook: {
-      name: 'Facebook Page (Faith Lutheran Church)',
-      count: fbCount,
-      required: REQUIRED_FB_IG,
-      passed: fbCount >= REQUIRED_FB_IG
-    },
-    instagram: {
-      name: 'Instagram (@faithlutheranlouisville)',
-      count: igCount,
-      required: REQUIRED_FB_IG,
-      passed: igCount >= REQUIRED_FB_IG
-    },
-    youtube_faith_lutheran: {
-      name: 'YouTube (Faith Lutheran Church)',
-      count: ytFaithCount,
-      required: REQUIRED_YT,
-      passed: ytFaithCount >= REQUIRED_YT
-    },
-    youtube_alien_righteousness: {
-      name: 'YouTube (Alien Righteousness)',
-      count: ytAlienCount,
-      required: REQUIRED_YT,
-      passed: ytAlienCount >= REQUIRED_YT
-    }
+    facebook: buildEntry('Facebook Page (Faith Lutheran Church)', fb, REQUIRED_FB_IG),
+    instagram: buildEntry('Instagram (@faithlutheranlouisville)', ig, REQUIRED_FB_IG),
+    youtube_faith_lutheran: buildEntry('YouTube (Faith Lutheran Church)', ytFaith, REQUIRED_YT),
+    youtube_alien_righteousness: buildEntry('YouTube (Alien Righteousness)', ytAlien, REQUIRED_YT)
   };
 
-  const failedAccounts = Object.values(accounts)
-    .filter((a) => !a.passed)
+  const values = Object.values(accounts);
+
+  const failedAccounts = values
+    .filter((a) => !a.passed && !a.error)
     .map((a) => `${a.name} (posted ${a.count} of ${a.required})`);
+
+  const unreadableAccounts = values
+    .filter((a) => a.error)
+    .map((a) => `${a.name} (${a.error})`);
 
   const status = {
     date_checked_et: et.dateStr,
     generated_at_utc: new Date().toISOString(),
     accounts,
-    all_passed: failedAccounts.length === 0,
-    failed_accounts: failedAccounts
+    all_passed: failedAccounts.length === 0 && unreadableAccounts.length === 0,
+    failed_accounts: failedAccounts,
+    unreadable_accounts: unreadableAccounts
   };
 
   fs.writeFileSync('status.json', JSON.stringify(status, null, 2));
