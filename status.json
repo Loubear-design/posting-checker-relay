@@ -1,18 +1,18 @@
 {
-  "date_checked_et": "2026-09-24",
-  "generated_at_utc": "2026-09-24T23:04:26.860Z",
+  "date_checked_et": "2026-09-25",
+  "generated_at_utc": "2026-09-25T21:54:26.034Z",
   "accounts": {
     "facebook": {
       "name": "Facebook Page (Faith Lutheran Church)",
       "required": 2,
-      "count": 1,
-      "passed": false
+      "count": 2,
+      "passed": true
     },
     "instagram": {
       "name": "Instagram (@faithlutheranlouisville)",
       "required": 2,
-      "count": 1,
-      "passed": false
+      "count": 11,
+      "passed": true
     },
     "youtube_faith_lutheran": {
       "name": "YouTube (Faith Lutheran Church)",
@@ -23,15 +23,11 @@
     "youtube_alien_righteousness": {
       "name": "YouTube (Alien Righteousness)",
       "required": 1,
-      "count": 0,
-      "passed": false
+      "count": 1,
+      "passed": true
     }
   },
-  "all_passed": false,
-  "failed_accounts": [
-    "Facebook Page (Faith Lutheran Church) (posted 1 of 2)",
-    "Instagram (@faithlutheranlouisville) (posted 1 of 2)",
-    "YouTube (Alien Righteousness) (posted 0 of 1)"
-  ],
+  "all_passed": true,
+  "failed_accounts": [],
   "unreadable_accounts": []
 }
